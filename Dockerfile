@@ -1,5 +1,8 @@
 FROM ghcr.io/gitroomhq/postiz-app:latest
 
+# Nginx config with /sso endpoint for SSO cookie setting
+COPY var/docker/nginx.conf /etc/nginx/nginx.conf
+
 # AI Recepce logo
 COPY logo.svg /app/apps/frontend/public/logo.svg
 COPY logo-text.svg /app/apps/frontend/public/logo-text.svg
