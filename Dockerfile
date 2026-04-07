@@ -4,8 +4,9 @@ FROM ghcr.io/gitroomhq/postiz-app:latest
 COPY logo.svg /app/apps/frontend/public/logo.svg
 COPY logo-text.svg /app/apps/frontend/public/logo-text.svg
 
-# AI Recepce theme — replace purple with orange in compiled CSS at BUILD TIME
-RUN find /app/apps/frontend/.next -name "*.css" -exec sed -i \
+# AI Recepce theme — replace purple with orange in ALL compiled CSS/JS
+# CSS files are in .next/static/chunks/*.css (not .next/static/css/)
+RUN find /app -name "*.css" -path "*/.next/*" -exec sed -i \
   -e 's/#612bd3/#E8751A/g' \
   -e 's/#612ad5/#E8751A/g' \
   -e 's/#7236f1/#D4650F/g' \
@@ -19,4 +20,16 @@ RUN find /app/apps/frontend/.next -name "*.css" -exec sed -i \
   -e 's/#3900b2/#C45A10/g' \
   -e 's/#ebe8ff/#FFF3E0/g' \
   -e 's/#2d1b57/#3D2008/g' \
-  {} + && echo "CSS patched successfully"
+  {} + && echo "CSS patched in chunks"
+
+# Also patch SCSS source (for any runtime compilation)
+RUN find /app -name "colors.scss" -exec sed -i \
+  -e 's/#612bd3/#E8751A/g' \
+  -e 's/#612ad5/#E8751A/g' \
+  -e 's/#7236f1/#D4650F/g' \
+  -e 's/#7950f2/#E8751A/g' \
+  -e 's/#8155dd/#F09030/g' \
+  -e 's/#832ad5/#E8751A/g' \
+  -e 's/#d82d7e/#E8751A/g' \
+  -e 's/#fc69ff/#E8751A/g' \
+  {} + 2>/dev/null || true
