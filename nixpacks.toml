@@ -1,0 +1,11 @@
+[phases.setup]
+aptPkgs = ["libatomic1"]
+
+[phases.install]
+cmds = ["npm i -g corepack@latest && corepack enable && corepack prepare --activate", "pnpm install --frozen-lockfile", "pnpm add -g pm2"]
+
+[phases.build]
+cmds = ["pnpm run build"]
+
+[start]
+cmd = "pnpm run pm2"
