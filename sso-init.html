@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Přihlášení...</title></head>
+<body>
+<script>
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var token = params.get('token');
+  if (token) {
+    document.cookie = 'auth=' + token + '; path=/; max-age=31536000; SameSite=Lax';
+    window.location.href = '/launches';
+  } else {
+    window.location.href = '/auth';
+  }
+})();
+</script>
+<noscript>Přesměrování...</noscript>
+</body>
+</html>
