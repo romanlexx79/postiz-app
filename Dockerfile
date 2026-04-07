@@ -1,4 +1,12 @@
 FROM ghcr.io/gitroomhq/postiz-app:latest
 
-# SSO landing page — prijme token z URL, nastavi cookie, redirectne na hlavni stranku
-COPY sso-init.html /app/apps/frontend/public/sso-init.html
+# AI Recepce theme override script
+COPY override-theme.sh /app/override-theme.sh
+RUN chmod +x /app/override-theme.sh
+
+# AI Recepce logo
+COPY logo.svg /app/apps/frontend/public/logo.svg
+COPY logo-text.svg /app/apps/frontend/public/logo-text.svg
+
+# Override CMD: apply theme THEN start normally
+CMD ["sh", "-c", "/app/override-theme.sh && nginx && pnpm run pm2"]
