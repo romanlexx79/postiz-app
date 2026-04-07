@@ -1,14 +1,13 @@
 FROM ghcr.io/gitroomhq/postiz-app:latest
 
-# Nginx config with /sso endpoint for SSO cookie setting
+# Nginx config with /sso endpoint
 COPY var/docker/nginx.conf /etc/nginx/nginx.conf
 
 # AI Recepce logo
 COPY logo.svg /app/apps/frontend/public/logo.svg
 COPY logo-text.svg /app/apps/frontend/public/logo-text.svg
 
-# AI Recepce theme — replace purple with orange in ALL compiled CSS/JS
-# CSS files are in .next/static/chunks/*.css (not .next/static/css/)
+# AI Recepce theme — replace purple with orange in compiled CSS
 RUN find /app -name "*.css" -path "*/.next/*" -exec sed -i \
   -e 's/#612bd3/#E8751A/g' \
   -e 's/#612ad5/#E8751A/g' \
@@ -23,9 +22,9 @@ RUN find /app -name "*.css" -path "*/.next/*" -exec sed -i \
   -e 's/#3900b2/#C45A10/g' \
   -e 's/#ebe8ff/#FFF3E0/g' \
   -e 's/#2d1b57/#3D2008/g' \
-  {} + && echo "CSS patched in chunks"
+  {} + && echo "CSS patched"
 
-# Also patch SCSS source (for any runtime compilation)
+# Also patch SCSS source
 RUN find /app -name "colors.scss" -exec sed -i \
   -e 's/#612bd3/#E8751A/g' \
   -e 's/#612ad5/#E8751A/g' \
