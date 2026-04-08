@@ -236,12 +236,24 @@ export const EditorWrapper: FC<{
     },
   });
 
-  // AI Recepce Context Actions
-  const aiRecepceBaseUrl = process.env.NEXT_PUBLIC_AI_RECEPCE_URL || process.env.MAIN_URL?.replace('/api', '') || '';
+  // AI Recepce Context — reaktivní state pro CopilotKit
+  const [aiRecepceContext, setAiRecepceContext] = useState('Žádný kontext zatím nenačten. Klikni na tlačítka Rezervace, Znalostní báze, Produkty nebo CRM v toolbaru pro načtení kontextu.');
+  const aiRecepceBaseUrl = process.env.NEXT_PUBLIC_AI_RECEPCE_URL || '';
+
+  // Polling pro kontext z window (nastavuje ho AiRecepceContextButtons)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const ctx = typeof window !== 'undefined' ? (window as any).__aiRecepceContext : null;
+      if (ctx && ctx !== aiRecepceContext) {
+        setAiRecepceContext(ctx);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [aiRecepceContext]);
 
   useCopilotReadable({
-    description: 'AI Recepce business context - use this to create relevant posts about the business',
-    value: (typeof window !== 'undefined' && (window as any).__aiRecepceContext) || 'No business context loaded yet. Use loadReservations, loadKnowledgeBase, loadProducts, or loadCRM tools to get context.',
+    description: 'AI Recepce business context loaded from the business system. Use this data to create relevant, accurate social media posts. This context updates when user clicks context buttons (Rezervace, Znalostní báze, Produkty, CRM).',
+    value: aiRecepceContext,
   });
 
   useCopilotAction({
