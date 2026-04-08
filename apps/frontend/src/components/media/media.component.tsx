@@ -32,6 +32,7 @@ import { ThirdPartyMedia } from '@gitroom/frontend/components/third-parties/thir
 import { ReactSortable } from 'react-sortablejs';
 import { MediaComponentInner } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { AiVideo } from '@gitroom/frontend/components/launches/ai.video';
+import { AiRecepceContextButtons } from '@gitroom/frontend/components/media/ai-recepce-context-buttons';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { ThirdPartyMediaLibrary } from '@gitroom/frontend/components/third-parties/third-party.media-library';
 import { Dashboard } from '@uppy/react';
@@ -838,6 +839,9 @@ export const MultiMediaComponent: FC<{
               </div>
 
               <ThirdPartyMedia allData={allData} onChange={changeMedia} />
+
+              {/* AI Recepce Context Buttons */}
+              <AiRecepceContextButtons />
 
               {!!user?.tier?.ai && (
                 <>

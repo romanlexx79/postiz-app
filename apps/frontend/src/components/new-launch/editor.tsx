@@ -236,6 +236,84 @@ export const EditorWrapper: FC<{
     },
   });
 
+  // AI Recepce Context Actions
+  const aiRecepceBaseUrl = process.env.NEXT_PUBLIC_AI_RECEPCE_URL || process.env.MAIN_URL?.replace('/api', '') || '';
+
+  useCopilotReadable({
+    description: 'AI Recepce business context - use this to create relevant posts about the business',
+    value: (typeof window !== 'undefined' && (window as any).__aiRecepceContext) || 'No business context loaded yet. Use loadReservations, loadKnowledgeBase, loadProducts, or loadCRM tools to get context.',
+  });
+
+  useCopilotAction({
+    name: 'loadReservations',
+    description: 'Load free reservation slots and services from AI Recepce. Use this when user wants to create a post about available appointments, bookings, or free time slots.',
+    parameters: [
+      { name: 'period', type: 'string', description: 'Time period: "today", "this_week", or "next_week"' },
+    ],
+    handler: async ({ period }) => {
+      try {
+        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/reservations?period=${period || 'this_week'}`, {
+          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
+        });
+        const data = await resp.json();
+        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
+        return data.textForAI;
+      } catch (e) { return 'Could not load reservations'; }
+    },
+  });
+
+  useCopilotAction({
+    name: 'loadKnowledgeBase',
+    description: 'Load knowledge base articles and FAQs from AI Recepce. Use this when user wants to create educational or informational posts based on their knowledge base.',
+    parameters: [
+      { name: 'search', type: 'string', description: 'Optional search term to filter KB articles' },
+    ],
+    handler: async ({ search }) => {
+      try {
+        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/kb${search ? `?search=${encodeURIComponent(search)}` : ''}`, {
+          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
+        });
+        const data = await resp.json();
+        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
+        return data.textForAI;
+      } catch (e) { return 'Could not load knowledge base'; }
+    },
+  });
+
+  useCopilotAction({
+    name: 'loadProducts',
+    description: 'Load products from AI Recepce e-shop. Use this when user wants to create promotional posts about their products or services.',
+    parameters: [
+      { name: 'search', type: 'string', description: 'Optional product name to search for' },
+    ],
+    handler: async ({ search }) => {
+      try {
+        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/products${search ? `?search=${encodeURIComponent(search)}` : ''}`, {
+          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
+        });
+        const data = await resp.json();
+        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
+        return data.textForAI;
+      } catch (e) { return 'Could not load products'; }
+    },
+  });
+
+  useCopilotAction({
+    name: 'loadCRM',
+    description: 'Load CRM data (contacts, deals, companies) from AI Recepce. Use this when user wants to create posts about business achievements, customer testimonials, or company milestones.',
+    parameters: [],
+    handler: async () => {
+      try {
+        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/crm`, {
+          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
+        });
+        const data = await resp.json();
+        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
+        return data.textForAI;
+      } catch (e) { return 'Could not load CRM data'; }
+    },
+  });
+
   const changeValue = useCallback(
     (index: number) => (value: string) => {
       if (internal) {
