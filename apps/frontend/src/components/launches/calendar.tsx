@@ -16,7 +16,7 @@ import {
 } from '@gitroom/frontend/components/launches/calendar.context';
 import dayjs from 'dayjs';
 import 'dayjs/locale/en';
-import 'dayjs/locale/he';
+import 'dayjs/locale/cs';
 import 'dayjs/locale/ru';
 import 'dayjs/locale/zh';
 import 'dayjs/locale/fr';
