@@ -1,44 +1,62 @@
 'use client';
 
 import React, { FC, useState } from 'react';
-import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const AI_RECEPCE_URL = process.env.NEXT_PUBLIC_AI_RECEPCE_URL || '';
 
-interface ContextData {
-  textForAI: string;
-  [key: string]: any;
-}
-
 const contextTypes = [
-  { key: 'reservations', label: 'Rezervace', icon: '📅', param: '?period=this_week' },
-  { key: 'kb', label: 'Znalostní báze', icon: '📚', param: '' },
-  { key: 'products', label: 'Produkty', icon: '🛍️', param: '' },
-  { key: 'crm', label: 'CRM', icon: '📊', param: '' },
+  { key: 'reservations', label: 'Rezervace', icon: '📅', prompt: 'Načti volné termíny z rezervačního systému a napiš příspěvek o dostupných časech tento týden.' },
+  { key: 'kb', label: 'Znalostní báze', icon: '📚', prompt: 'Načti články ze znalostní báze a napiš informační příspěvek na základě obsahu.' },
+  { key: 'products', label: 'Produkty', icon: '🛍️', prompt: 'Načti produkty z e-shopu a napiš propagační příspěvek o nabídce.' },
+  { key: 'crm', label: 'CRM', icon: '📊', prompt: 'Načti CRM data (zákazníky, obchody) a napiš příspěvek o úspěších firmy.' },
 ] as const;
 
 export const AiRecepceContextButtons: FC = () => {
-  const [loading, setLoading] = useState<string | null>(null);
   const [activeContext, setActiveContext] = useState<string | null>(null);
-  const t = useT();
+  const [loading, setLoading] = useState<string | null>(null);
+  const [loadedText, setLoadedText] = useState<string | null>(null);
 
-  const loadContext = async (type: string, param: string) => {
-    if (!AI_RECEPCE_URL) return;
-    setLoading(type);
+  const handleClick = async (key: string, prompt: string) => {
+    setLoading(key);
+    setLoadedText(null);
+
     try {
-      const authCookie = document.cookie.match(/auth=([^;]+)/)?.[1] || '';
-      const resp = await fetch(`${AI_RECEPCE_URL}/api/social-media/context/${type}${param}`, {
-        headers: { 'Authorization': `Bearer ${authCookie}` },
+      // Načíst kontext z AI Recepce
+      const resp = await fetch(`${AI_RECEPCE_URL}/api/social-media/context/${key === 'kb' ? 'kb' : key}${key === 'reservations' ? '?period=this_week' : ''}`, {
+        headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
       });
-      const data: ContextData = await resp.json();
-      if (data.textForAI) {
-        // Store context for CopilotKit to read
-        (window as any).__aiRecepceContext = data.textForAI;
-        (window as any).__aiRecepceContextData = data;
-        setActiveContext(type);
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const contextText = data.textForAI || JSON.stringify(data);
+
+        // Uložit kontext pro CopilotKit
+        (window as any).__aiRecepceContext = contextText;
+
+        // Najít chatbot input a vložit prompt
+        const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
+        if (chatInput) {
+          chatInput.value = prompt;
+          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+          chatInput.focus();
+        }
+
+        setActiveContext(key);
+        setLoadedText(contextText.substring(0, 80) + '...');
+      } else {
+        setLoadedText('Chyba při načítání dat');
       }
     } catch (e) {
-      console.error(`Failed to load ${type} context:`, e);
+      // CORS fallback — vložit prompt přímo do chatbot inputu
+      // CopilotKit actions na backendu si data načtou samy
+      const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
+      if (chatInput) {
+        chatInput.value = prompt;
+        chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+        chatInput.focus();
+      }
+      setActiveContext(key);
+      setLoadedText('Kontext se načte přes AI asistenta');
     } finally {
       setLoading(null);
     }
@@ -48,16 +66,16 @@ export const AiRecepceContextButtons: FC = () => {
 
   return (
     <>
-      {contextTypes.map(({ key, label, icon, param }) => (
+      {contextTypes.map(({ key, label, icon, prompt }) => (
         <div
           key={key}
-          onClick={() => loadContext(key, param)}
-          className={`cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex px-[8px] transition-colors ${
+          onClick={() => handleClick(key, prompt)}
+          className={`cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex px-[8px] transition-all ${
             activeContext === key
-              ? 'bg-btnPrimary text-white'
+              ? 'bg-btnPrimary text-white scale-95'
               : 'bg-newColColor hover:bg-btnPrimary/20'
-          } ${loading === key ? 'opacity-50 pointer-events-none' : ''}`}
-          title={`${t('load_context', 'Načíst kontext')}: ${label}`}
+          } ${loading === key ? 'opacity-50 animate-pulse pointer-events-none' : ''}`}
+          title={label}
         >
           <div className="flex gap-[4px] items-center">
             <span className="text-[12px]">{icon}</span>
@@ -67,6 +85,11 @@ export const AiRecepceContextButtons: FC = () => {
           </div>
         </div>
       ))}
+      {loadedText && (
+        <div className="absolute bottom-[45px] left-0 right-0 bg-btnPrimary/10 border border-btnPrimary/30 rounded-md px-3 py-1.5 text-[10px] text-textColor mx-2">
+          ✓ {loadedText}
+        </div>
+      )}
     </>
   );
 };
