@@ -1,98 +1,261 @@
 'use client';
 
-import React, { FC, useState } from 'react';
+import React, { FC, useState, useEffect, useCallback } from 'react';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
 const AI_RECEPCE_URL = process.env.NEXT_PUBLIC_AI_RECEPCE_URL || '';
 
+// ============================================================
+// Context Selection Modal — zobrazí seznam položek s checkboxy
+// ============================================================
+
+interface ContextItem {
+  id: string;
+  name: string;
+  description?: string;
+  type?: string;
+}
+
+const ContextSelectionModal: FC<{
+  title: string;
+  type: string;
+  onSelect: (items: ContextItem[], contextText: string) => void;
+}> = ({ title, type, onSelect }) => {
+  const [items, setItems] = useState<ContextItem[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [contextData, setContextData] = useState<any>(null);
+  const modal = useModals();
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const url = `${AI_RECEPCE_URL}/api/social-media/context/${type}${type === 'reservations' ? '?period=this_week' : ''}`;
+        const resp = await fetch(url);
+        if (!resp.ok) throw new Error('Chyba při načítání');
+        const data = await resp.json();
+        setContextData(data);
+
+        // Mapovat data na ContextItem podle typu
+        let mapped: ContextItem[] = [];
+        if (type === 'kb') {
+          mapped = [
+            ...(data.knowledgeBases || []).map((kb: any) => ({
+              id: kb.id, name: kb.name, description: `Typ: ${kb.type}`, type: 'kb',
+            })),
+            ...(data.articles || []).map((a: any) => ({
+              id: a.id, name: a.title, description: a.excerpt?.substring(0, 60), type: 'article',
+            })),
+            ...(data.faqs || []).map((f: any) => ({
+              id: f.id, name: f.question, description: f.answer?.substring(0, 60), type: 'faq',
+            })),
+          ];
+        } else if (type === 'products') {
+          mapped = (data.products || []).map((p: any) => ({
+            id: p.id, name: p.name,
+            description: p.variants?.[0]?.basePrice ? `${p.variants[0].basePrice} Kč` : p.description?.substring(0, 60),
+          }));
+        } else if (type === 'reservations') {
+          mapped = [
+            ...(data.calendars || []).map((c: any) => ({
+              id: c.id, name: `Kalendář: ${c.name}`, description: `${c.startHour || 8}:00 - ${c.endHour || 18}:00`,
+            })),
+            ...(data.services || []).map((s: any) => ({
+              id: s.id, name: s.name, description: `${s.duration} min — ${s.price} ${s.currency || 'CZK'}`,
+            })),
+          ];
+        } else if (type === 'crm') {
+          mapped = [
+            { id: 'contacts', name: `Kontakty: ${data.contactCount || 0}`, description: 'Počet kontaktů v CRM' },
+            { id: 'deals', name: `Obchody: ${data.dealCount || 0} (${data.wonDeals || 0} uzavřených)`, description: `Celkem: ${data.totalRevenue || 0} Kč` },
+            { id: 'companies', name: `Firmy: ${data.companyCount || 0}`, description: 'Počet firem v CRM' },
+            ...(data.recentDeals || []).map((d: any) => ({
+              id: d.title, name: `Deal: ${d.title}`, description: `${d.value} ${d.currency || 'CZK'}`,
+            })),
+          ];
+        }
+        setItems(mapped);
+
+        // Vybrat vše defaultně
+        if (mapped.length > 0) {
+          setSelected(new Set(mapped.map(m => m.id)));
+        }
+      } catch (e: any) {
+        setError(e.message || 'Nepodařilo se načíst data');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [type]);
+
+  const toggleItem = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selected.size === items.length) setSelected(new Set());
+    else setSelected(new Set(items.map(i => i.id)));
+  };
+
+  const confirm = () => {
+    const selectedItems = items.filter(i => selected.has(i.id));
+
+    // Sestavit kontextový text z vybraných položek
+    let contextText = contextData?.textForAI || '';
+    if (type === 'kb' && selectedItems.length < items.length) {
+      contextText = selectedItems.map(i => {
+        if (i.type === 'faq') return `FAQ: ${i.name} → ${i.description}`;
+        if (i.type === 'article') return `Článek: ${i.name}`;
+        return `KB: ${i.name}`;
+      }).join('. ');
+    } else if (type === 'products' && selectedItems.length < items.length) {
+      contextText = 'Vybrané produkty: ' + selectedItems.map(i => `${i.name} (${i.description})`).join(', ');
+    }
+
+    onSelect(selectedItems, contextText);
+    modal.closeAll();
+  };
+
+  return (
+    <ModalWrapperComponent title={title}>
+      <div className="flex flex-col gap-3 max-h-[400px] overflow-y-auto">
+        {loading && <div className="text-center py-4 text-textItemBlur">Načítání...</div>}
+        {error && <div className="text-center py-4 text-red-500">{error}</div>}
+        {!loading && items.length === 0 && (
+          <div className="text-center py-4 text-textItemBlur">Žádná data</div>
+        )}
+        {items.length > 0 && (
+          <div
+            className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-newBgLineColor rounded-lg border-b border-newBorder"
+            onClick={toggleAll}
+          >
+            <input
+              type="checkbox"
+              checked={selected.size === items.length}
+              readOnly
+              className="accent-[#E8751A] w-4 h-4"
+            />
+            <span className="text-sm font-semibold">
+              {selected.size === items.length ? 'Zrušit vše' : 'Vybrat vše'}
+            </span>
+          </div>
+        )}
+        {items.map((item) => (
+          <div
+            key={item.id}
+            className={`flex items-center gap-3 px-3 py-2 cursor-pointer rounded-lg transition-colors ${
+              selected.has(item.id) ? 'bg-btnPrimary/10 border border-btnPrimary/30' : 'hover:bg-newBgLineColor'
+            }`}
+            onClick={() => toggleItem(item.id)}
+          >
+            <input
+              type="checkbox"
+              checked={selected.has(item.id)}
+              readOnly
+              className="accent-[#E8751A] w-4 h-4 shrink-0"
+            />
+            <div className="min-w-0">
+              <div className="text-sm font-medium truncate">{item.name}</div>
+              {item.description && (
+                <div className="text-xs text-textItemBlur truncate">{item.description}</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      {items.length > 0 && (
+        <button
+          onClick={confirm}
+          className="mt-4 w-full bg-btnPrimary text-white py-2.5 rounded-lg font-semibold hover:opacity-90 transition-opacity"
+        >
+          Použít vybrané ({selected.size})
+        </button>
+      )}
+    </ModalWrapperComponent>
+  );
+};
+
+// ============================================================
+// Toolbar Buttons
+// ============================================================
+
 const contextTypes = [
-  { key: 'reservations', label: 'Rezervace', icon: '📅', prompt: 'Načti volné termíny z rezervačního systému a napiš příspěvek o dostupných časech tento týden.' },
-  { key: 'kb', label: 'Znalostní báze', icon: '📚', prompt: 'Načti články ze znalostní báze a napiš informační příspěvek na základě obsahu.' },
-  { key: 'products', label: 'Produkty', icon: '🛍️', prompt: 'Načti produkty z e-shopu a napiš propagační příspěvek o nabídce.' },
-  { key: 'crm', label: 'CRM', icon: '📊', prompt: 'Načti CRM data (zákazníky, obchody) a napiš příspěvek o úspěších firmy.' },
+  { key: 'reservations', label: 'Rezervace', icon: '📅', title: 'Vybrat rezervace a služby' },
+  { key: 'kb', label: 'Znalostní báze', icon: '📚', title: 'Vybrat znalostní bázi' },
+  { key: 'products', label: 'Produkty', icon: '🛍️', title: 'Vybrat produkty' },
+  { key: 'crm', label: 'CRM', icon: '📊', title: 'Vybrat CRM data' },
 ] as const;
 
 export const AiRecepceContextButtons: FC = () => {
-  const [activeContext, setActiveContext] = useState<string | null>(null);
-  const [loading, setLoading] = useState<string | null>(null);
-  const [loadedText, setLoadedText] = useState<string | null>(null);
+  const [activeContexts, setActiveContexts] = useState<Record<string, string>>({});
+  const modal = useModals();
 
-  const handleClick = async (key: string, prompt: string) => {
-    setLoading(key);
-    setLoadedText(null);
+  const openContextModal = useCallback((type: string, title: string) => {
+    modal.openModal({
+      title,
+      withCloseButton: true,
+      children: (
+        <ContextSelectionModal
+          title={title}
+          type={type}
+          onSelect={(items, contextText) => {
+            // Uložit vybraný kontext
+            setActiveContexts(prev => ({ ...prev, [type]: contextText }));
 
-    try {
-      const resp = await fetch(`${AI_RECEPCE_URL}/api/social-media/context/${key}${key === 'reservations' ? '?period=this_week' : ''}`);
+            // Uložit do window pro CopilotKit readable
+            const allContexts = { ...activeContexts, [type]: contextText };
+            (window as any).__aiRecepceContext = Object.values(allContexts).filter(Boolean).join('\n\n');
 
-      if (resp.ok) {
-        const data = await resp.json();
-        const contextText = data.textForAI || '';
+            // Předvyplnit chatbot
+            const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
+            if (chatInput) {
+              const prompt = type === 'kb'
+                ? 'Na základě vybrané znalostní báze napiš informační příspěvek.'
+                : type === 'products'
+                ? 'Na základě vybraných produktů napiš propagační příspěvek.'
+                : type === 'reservations'
+                ? 'Na základě volných termínů napiš příspěvek o dostupnosti.'
+                : 'Na základě CRM dat napiš příspěvek o úspěších firmy.';
 
-        // Uložit kontext pro CopilotKit readable
-        (window as any).__aiRecepceContext = contextText;
-
-        // Předvyplnit chatbot input s kontextem
-        const fullPrompt = contextText
-          ? `Na základě těchto dat: "${contextText.substring(0, 300)}" — ${prompt}`
-          : prompt;
-
-        const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
-        if (chatInput) {
-          // React-friendly way to set value
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-          nativeInputValueSetter?.call(chatInput, fullPrompt);
-          chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-          chatInput.focus();
-        }
-
-        setActiveContext(key);
-        setLoadedText(contextText ? contextText.substring(0, 80) + '...' : 'Data načtena');
-        return;
-      }
-    } catch (e) {
-      // Fetch failed — fallback: just prefill prompt for CopilotKit
-    }
-
-    // Fallback: vložit prompt bez dat — CopilotKit backend tool si data načte sám
-    const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
-    if (chatInput) {
-      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-      nativeInputValueSetter?.call(chatInput, prompt);
-      chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-      chatInput.focus();
-    }
-    setActiveContext(key);
-    setLoadedText('Zeptej se AI asistenta →');
-    setLoading(null);
-  };
+              const fullPrompt = `Kontext: ${contextText.substring(0, 300)}. ${prompt}`;
+              const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+              setter?.call(chatInput, fullPrompt);
+              chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+              chatInput.focus();
+            }
+          }}
+        />
+      ),
+    });
+  }, [modal, activeContexts]);
 
   if (!AI_RECEPCE_URL) return null;
 
   return (
     <>
-      {contextTypes.map(({ key, label, icon, prompt }) => (
+      {contextTypes.map(({ key, label, icon, title }) => (
         <div
           key={key}
-          onClick={() => handleClick(key, prompt)}
+          onClick={() => openContextModal(key, title)}
           className={`cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex px-[8px] transition-all ${
-            activeContext === key
-              ? 'bg-btnPrimary text-white scale-95'
+            activeContexts[key]
+              ? 'bg-btnPrimary text-white'
               : 'bg-newColColor hover:bg-btnPrimary/20'
-          } ${loading === key ? 'opacity-50 animate-pulse pointer-events-none' : ''}`}
-          title={label}
+          }`}
+          title={title}
         >
           <div className="flex gap-[4px] items-center">
             <span className="text-[12px]">{icon}</span>
-            <span className="text-[10px] font-[600] iconBreak:hidden block">
-              {loading === key ? '...' : label}
-            </span>
+            <span className="text-[10px] font-[600] iconBreak:hidden block">{label}</span>
           </div>
         </div>
       ))}
-      {loadedText && (
-        <div className="absolute bottom-[45px] left-0 right-0 bg-btnPrimary/10 border border-btnPrimary/30 rounded-md px-3 py-1.5 text-[10px] text-textColor mx-2 animate-fadeIn">
-          ✓ {loadedText}
-        </div>
-      )}
     </>
   );
 };
