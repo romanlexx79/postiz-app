@@ -32,7 +32,10 @@ const ContextSelectionModal: FC<{
   useEffect(() => {
     (async () => {
       try {
-        const url = `${AI_RECEPCE_URL}/api/social-media/context/${type}${type === 'reservations' ? '?period=this_week' : ''}`;
+        // Postiz auth cookie → předat jako query param pro tenant identifikaci
+        const authToken = document.cookie.match(/auth=([^;]+)/)?.[1] || '';
+        const sep = type === 'reservations' ? '&' : '?';
+        const url = `${AI_RECEPCE_URL}/api/social-media/context/${type}${type === 'reservations' ? '?period=this_week' : ''}${authToken ? `${type === 'reservations' ? '&' : '?'}auth=${encodeURIComponent(authToken)}` : ''}`;
         const resp = await fetch(url);
         if (!resp.ok) throw new Error('Chyba při načítání');
         const data = await resp.json();
