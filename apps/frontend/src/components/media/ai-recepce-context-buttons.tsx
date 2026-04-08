@@ -226,11 +226,25 @@ export const AiRecepceContextButtons: FC = () => {
                 ? 'Na základě volných termínů napiš příspěvek o dostupnosti.'
                 : 'Na základě CRM dat napiš příspěvek o úspěších firmy.';
 
-              const fullPrompt = `Kontext: ${contextText.substring(0, 300)}. ${prompt}`;
+              const fullPrompt = `Kontext: ${contextText.substring(0, 500)}. ${prompt}`;
               const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
               setter?.call(chatInput, fullPrompt);
               chatInput.dispatchEvent(new Event('input', { bubbles: true }));
               chatInput.focus();
+
+              // Automaticky odeslat zprávu po 500ms
+              setTimeout(() => {
+                // Najít submit button v CopilotKit
+                const submitBtn = chatInput.closest('form')?.querySelector('button[type="submit"]')
+                  || chatInput.parentElement?.querySelector('button')
+                  || document.querySelector('[class*="copilot"] button[type="submit"]');
+                if (submitBtn) {
+                  (submitBtn as HTMLButtonElement).click();
+                } else {
+                  // Fallback: dispatch Enter
+                  chatInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+                }
+              }, 500);
             }
           }}
         />
