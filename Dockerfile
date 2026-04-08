@@ -22,6 +22,9 @@ COPY . /app
 # AI Recepce nginx config (with /sso endpoint)
 COPY var/docker/nginx.conf /etc/nginx/nginx.conf
 
+# AI Recepce URL for context buttons (must be set at build time for NEXT_PUBLIC_*)
+ENV NEXT_PUBLIC_AI_RECEPCE_URL=https://web-firmy-production.up.railway.app
+
 # Install dependencies
 RUN pnpm install
 
