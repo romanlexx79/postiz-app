@@ -21,45 +21,48 @@ export const AiRecepceContextButtons: FC = () => {
     setLoadedText(null);
 
     try {
-      // Načíst kontext z AI Recepce
-      const resp = await fetch(`${AI_RECEPCE_URL}/api/social-media/context/${key === 'kb' ? 'kb' : key}${key === 'reservations' ? '?period=this_week' : ''}`, {
-        headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
-      });
+      const resp = await fetch(`${AI_RECEPCE_URL}/api/social-media/context/${key}${key === 'reservations' ? '?period=this_week' : ''}`);
 
       if (resp.ok) {
         const data = await resp.json();
-        const contextText = data.textForAI || JSON.stringify(data);
+        const contextText = data.textForAI || '';
 
-        // Uložit kontext pro CopilotKit
+        // Uložit kontext pro CopilotKit readable
         (window as any).__aiRecepceContext = contextText;
 
-        // Najít chatbot input a vložit prompt
+        // Předvyplnit chatbot input s kontextem
+        const fullPrompt = contextText
+          ? `Na základě těchto dat: "${contextText.substring(0, 300)}" — ${prompt}`
+          : prompt;
+
         const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
         if (chatInput) {
-          chatInput.value = prompt;
+          // React-friendly way to set value
+          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+          nativeInputValueSetter?.call(chatInput, fullPrompt);
           chatInput.dispatchEvent(new Event('input', { bubbles: true }));
           chatInput.focus();
         }
 
         setActiveContext(key);
-        setLoadedText(contextText.substring(0, 80) + '...');
-      } else {
-        setLoadedText('Chyba při načítání dat');
+        setLoadedText(contextText ? contextText.substring(0, 80) + '...' : 'Data načtena');
+        return;
       }
     } catch (e) {
-      // CORS fallback — vložit prompt přímo do chatbot inputu
-      // CopilotKit actions na backendu si data načtou samy
-      const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
-      if (chatInput) {
-        chatInput.value = prompt;
-        chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-        chatInput.focus();
-      }
-      setActiveContext(key);
-      setLoadedText('Kontext se načte přes AI asistenta');
-    } finally {
-      setLoading(null);
+      // Fetch failed — fallback: just prefill prompt for CopilotKit
     }
+
+    // Fallback: vložit prompt bez dat — CopilotKit backend tool si data načte sám
+    const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
+    if (chatInput) {
+      const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+      nativeInputValueSetter?.call(chatInput, prompt);
+      chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+      chatInput.focus();
+    }
+    setActiveContext(key);
+    setLoadedText('Zeptej se AI asistenta →');
+    setLoading(null);
   };
 
   if (!AI_RECEPCE_URL) return null;
@@ -86,7 +89,7 @@ export const AiRecepceContextButtons: FC = () => {
         </div>
       ))}
       {loadedText && (
-        <div className="absolute bottom-[45px] left-0 right-0 bg-btnPrimary/10 border border-btnPrimary/30 rounded-md px-3 py-1.5 text-[10px] text-textColor mx-2">
+        <div className="absolute bottom-[45px] left-0 right-0 bg-btnPrimary/10 border border-btnPrimary/30 rounded-md px-3 py-1.5 text-[10px] text-textColor mx-2 animate-fadeIn">
           ✓ {loadedText}
         </div>
       )}
