@@ -43,6 +43,15 @@ export const Input = ({
     textareaRef.current?.focus();
   };
 
+  // Expose send function for context buttons (AI Recepce integration)
+  React.useEffect(() => {
+    (window as any).__copilotSendMessage = (message: string) => {
+      if (inProgress) return;
+      onSend(message);
+    };
+    return () => { delete (window as any).__copilotSendMessage; };
+  }, [inProgress, onSend]);
+
   const isInProgress = inProgress;
   const buttonIcon =
     isInProgress && !hideStopButton

@@ -65,6 +65,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
+  // AI Recepce kontext — reaktivní pro CopilotPopup instructions
+  const [aiRecepceCtx, setAiRecepceCtx] = useState('');
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const ctx = typeof window !== 'undefined' ? (window as any).__aiRecepceContext || '' : '';
+      if (ctx !== aiRecepceCtx) setAiRecepceCtx(ctx);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [aiRecepceCtx]);
+
   const {
     selectedIntegrations,
     hide,
@@ -667,15 +677,19 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         hitEscapeToClose={false}
         clickOutsideToClose={true}
         instructions={`
-You are an assistant that help the user to schedule their social media posts,
+You are an assistant that help the user to schedule their social media posts.
 Here are the things you can do:
 - Add a new comment / post to the list of posts
 - Delete a comment / post from the list of posts
 - Add content to the comment / post
 - Activate or deactivate the comment / post
+- Use business context from AI Recepce (loaded via toolbar buttons: Rezervace, Znalostní báze, Produkty, CRM)
 
 Post content can be added using the addPostContentFor{num} function.
 After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} function.
+
+IMPORTANT: If the user provides business context (starting with "Kontext:"), use that data to create accurate, relevant posts. Write in Czech language.
+${aiRecepceCtx ? '\n\nBUSINESS CONTEXT (use this data to create posts):\n' + aiRecepceCtx : ''}
 `}
         labels={{
           title: t('your_assistant', 'Your Assistant'),
