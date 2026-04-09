@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useState, useEffect, useCallback } from 'react';
+import React, { FC, useState, useEffect, useCallback, useRef } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 
@@ -197,6 +197,8 @@ const contextTypes = [
 
 export const AiRecepceContextButtons: FC = () => {
   const [activeContexts, setActiveContexts] = useState<Record<string, string>>({});
+  const activeContextsRef = useRef(activeContexts);
+  activeContextsRef.current = activeContexts;
   const modal = useModals();
 
   const openContextModal = useCallback((type: string, title: string) => {
@@ -208,18 +210,18 @@ export const AiRecepceContextButtons: FC = () => {
           title={title}
           type={type}
           onSelect={(items, contextText) => {
-            // Uložit vybraný kontext
-            setActiveContexts(prev => ({ ...prev, [type]: contextText }));
+            // Aktualizovat active state přes ref (no stale closure)
+            const updated = { ...activeContextsRef.current, [type]: contextText };
+            setActiveContexts(updated);
 
-            // Dispatch custom event → editor.tsx useCopilotReadable se aktualizuje
-            const allContexts = { ...activeContexts, [type]: contextText };
-            const fullContext = Object.values(allContexts).filter(Boolean).join('\n\n');
+            // Dispatch custom event → editor.tsx useCopilotReadable
+            const fullContext = Object.values(updated).filter(Boolean).join('\n\n');
             window.dispatchEvent(new CustomEvent('airecepce-context', { detail: fullContext }));
           }}
         />
       ),
     });
-  }, [modal, activeContexts]);
+  }, [modal]);
 
   if (!AI_RECEPCE_URL) return null;
 
