@@ -122,7 +122,7 @@ const ContextSelectionModal: FC<{
     }
 
     onSelect(selectedItems, contextText);
-    modal.closeAll();
+    modal.closeCurrent();
   };
 
   return (
