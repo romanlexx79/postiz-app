@@ -88,6 +88,10 @@ const ReservationsModal: FC<{ onDone: (t: string) => void }> = ({ onDone }) => {
   const [slots, setSlots] = useState<any[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState<Set<string>>(new Set());
+  const today = new Date().toISOString().split('T')[0];
+  const defaultEnd = new Date(Date.now() + 14*86400000).toISOString().split('T')[0];
+  const [dateFrom, setDateFrom] = useState(today);
+  const [dateTo, setDateTo] = useState(defaultEnd);
   const modal = useModals();
 
   useEffect(() => {
@@ -99,18 +103,18 @@ const ReservationsModal: FC<{ onDone: (t: string) => void }> = ({ onDone }) => {
   }, []);
 
   const loadSlots = useCallback(async()=>{
-    if(!selectedCal||!selectedSvc) return;
+    if(!selectedCal||!selectedSvc||!dateFrom||!dateTo) return;
     setSlotsLoading(true);
+    setSlots([]);
+    setSelectedSlots(new Set());
     try {
-      const today = new Date();
-      const end = new Date(today); end.setDate(today.getDate()+14);
-      const d = await fetchCtx(`free-slots?calendarId=${selectedCal}&serviceId=${selectedSvc}&from=${today.toISOString().split('T')[0]}&to=${end.toISOString().split('T')[0]}`);
+      const d = await fetchCtx(`free-slots?calendarId=${selectedCal}&serviceId=${selectedSvc}&from=${dateFrom}&to=${dateTo}`);
       setSlots(d.slots||[]);
     } catch { setSlots([]); }
     finally { setSlotsLoading(false); }
-  },[selectedCal, selectedSvc]);
+  },[selectedCal, selectedSvc, dateFrom, dateTo]);
 
-  useEffect(()=>{ if(selectedCal&&selectedSvc) loadSlots(); },[selectedCal, selectedSvc, loadSlots]);
+  // No auto-load — user clicks "Načíst volné termíny" button
 
   const toggleSlot = (i:string) => setSelectedSlots(p=>{const n=new Set(p);n.has(i)?n.delete(i):n.add(i);return n});
 
@@ -139,8 +143,22 @@ const ReservationsModal: FC<{ onDone: (t: string) => void }> = ({ onDone }) => {
           {(data?.services||[]).map((s:any)=><option key={s.id} value={s.id}>{s.name} ({s.duration} min, {s.price} {s.currency||'CZK'})</option>)}
         </select>
       </div>
+      {/* Období */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-xs font-semibold text-textItemBlur mb-1 block">Od</label>
+          <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="w-full bg-newBgLineColor text-textColor border border-newBorder rounded-lg px-3 py-2 text-sm"/>
+        </div>
+        <div className="flex-1">
+          <label className="text-xs font-semibold text-textItemBlur mb-1 block">Do</label>
+          <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="w-full bg-newBgLineColor text-textColor border border-newBorder rounded-lg px-3 py-2 text-sm"/>
+        </div>
+      </div>
+      <button onClick={loadSlots} disabled={slotsLoading||!selectedCal||!selectedSvc} className="w-full bg-newColColor text-textColor py-2 rounded-lg text-sm font-semibold hover:bg-btnPrimary/20 disabled:opacity-50">
+        {slotsLoading ? 'Načítání...' : 'Načíst volné termíny'}
+      </button>
       <div>
-        <label className="text-xs font-semibold text-textItemBlur mb-1 block">Volné termíny (14 dní) {slotsLoading&&'— načítání...'}</label>
+        <label className="text-xs font-semibold text-textItemBlur mb-1 block">Volné termíny {slots.length>0&&`(${slots.length})`}</label>
         <div className="max-h-[250px] overflow-y-auto flex flex-col gap-1">
           {slots.length===0&&!slotsLoading&&<div className="text-sm text-textItemBlur py-2">Žádné volné termíny</div>}
           {slots.map((s:any,i:number)=>(
