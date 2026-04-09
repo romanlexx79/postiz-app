@@ -65,15 +65,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
-  // AI Recepce kontext — reaktivní pro CopilotPopup instructions
+  // AI Recepce kontext — aktualizuje se přes custom event
   const [aiRecepceCtx, setAiRecepceCtx] = useState('');
   useEffect(() => {
-    const interval = setInterval(() => {
-      const ctx = typeof window !== 'undefined' ? (window as any).__aiRecepceContext || '' : '';
-      if (ctx !== aiRecepceCtx) setAiRecepceCtx(ctx);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [aiRecepceCtx]);
+    const handler = (e: CustomEvent) => setAiRecepceCtx(e.detail || '');
+    window.addEventListener('airecepce-context', handler as EventListener);
+    return () => window.removeEventListener('airecepce-context', handler as EventListener);
+  }, []);
 
   const {
     selectedIntegrations,

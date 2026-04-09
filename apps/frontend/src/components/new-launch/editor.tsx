@@ -236,95 +236,22 @@ export const EditorWrapper: FC<{
     },
   });
 
-  // AI Recepce Context — reaktivní state pro CopilotKit
-  const [aiRecepceContext, setAiRecepceContext] = useState('Žádný kontext zatím nenačten. Klikni na tlačítka Rezervace, Znalostní báze, Produkty nebo CRM v toolbaru pro načtení kontextu.');
-  const aiRecepceBaseUrl = process.env.NEXT_PUBLIC_AI_RECEPCE_URL || '';
+  // AI Recepce Context — aktualizuje se přes custom event z context buttons
+  const [aiRecepceContext, setAiRecepceContext] = useState('');
 
-  // Polling pro kontext z window (nastavuje ho AiRecepceContextButtons)
   useEffect(() => {
-    const interval = setInterval(() => {
-      const ctx = typeof window !== 'undefined' ? (window as any).__aiRecepceContext : null;
-      if (ctx && ctx !== aiRecepceContext) {
-        setAiRecepceContext(ctx);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [aiRecepceContext]);
+    const handler = (e: CustomEvent) => setAiRecepceContext(e.detail || '');
+    window.addEventListener('airecepce-context', handler as EventListener);
+    return () => window.removeEventListener('airecepce-context', handler as EventListener);
+  }, []);
 
   useCopilotReadable({
-    description: 'AI Recepce business context loaded from the business system. Use this data to create relevant, accurate social media posts. This context updates when user clicks context buttons (Rezervace, Znalostní báze, Produkty, CRM).',
-    value: aiRecepceContext,
+    description: 'Business data from AI Recepce CRM/KB/Products/Reservations. Use this to create accurate posts.',
+    value: aiRecepceContext || 'No context loaded.',
   });
 
-  useCopilotAction({
-    name: 'loadReservations',
-    description: 'Load free reservation slots and services from AI Recepce. Use this when user wants to create a post about available appointments, bookings, or free time slots.',
-    parameters: [
-      { name: 'period', type: 'string', description: 'Time period: "today", "this_week", or "next_week"' },
-    ],
-    handler: async ({ period }) => {
-      try {
-        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/reservations?period=${period || 'this_week'}`, {
-          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
-        });
-        const data = await resp.json();
-        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
-        return data.textForAI;
-      } catch (e) { return 'Could not load reservations'; }
-    },
-  });
-
-  useCopilotAction({
-    name: 'loadKnowledgeBase',
-    description: 'Load knowledge base articles and FAQs from AI Recepce. Use this when user wants to create educational or informational posts based on their knowledge base.',
-    parameters: [
-      { name: 'search', type: 'string', description: 'Optional search term to filter KB articles' },
-    ],
-    handler: async ({ search }) => {
-      try {
-        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/kb${search ? `?search=${encodeURIComponent(search)}` : ''}`, {
-          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
-        });
-        const data = await resp.json();
-        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
-        return data.textForAI;
-      } catch (e) { return 'Could not load knowledge base'; }
-    },
-  });
-
-  useCopilotAction({
-    name: 'loadProducts',
-    description: 'Load products from AI Recepce e-shop. Use this when user wants to create promotional posts about their products or services.',
-    parameters: [
-      { name: 'search', type: 'string', description: 'Optional product name to search for' },
-    ],
-    handler: async ({ search }) => {
-      try {
-        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/products${search ? `?search=${encodeURIComponent(search)}` : ''}`, {
-          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
-        });
-        const data = await resp.json();
-        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
-        return data.textForAI;
-      } catch (e) { return 'Could not load products'; }
-    },
-  });
-
-  useCopilotAction({
-    name: 'loadCRM',
-    description: 'Load CRM data (contacts, deals, companies) from AI Recepce. Use this when user wants to create posts about business achievements, customer testimonials, or company milestones.',
-    parameters: [],
-    handler: async () => {
-      try {
-        const resp = await fetch(`${aiRecepceBaseUrl}/api/social-media/context/crm`, {
-          headers: { 'Authorization': `Bearer ${document.cookie.match(/auth=([^;]+)/)?.[1] || ''}` },
-        });
-        const data = await resp.json();
-        if (typeof window !== 'undefined') (window as any).__aiRecepceContext = data.textForAI;
-        return data.textForAI;
-      } catch (e) { return 'Could not load CRM data'; }
-    },
-  });
+  // CopilotKit actions removed — context is injected via useCopilotReadable + custom event
+  // Context buttons fetch data and dispatch 'airecepce-context' event → readable updates
 
   const changeValue = useCallback(
     (index: number) => (value: string) => {

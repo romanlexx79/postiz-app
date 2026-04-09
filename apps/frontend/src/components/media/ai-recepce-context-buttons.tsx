@@ -211,41 +211,10 @@ export const AiRecepceContextButtons: FC = () => {
             // Uložit vybraný kontext
             setActiveContexts(prev => ({ ...prev, [type]: contextText }));
 
-            // Uložit do window pro CopilotKit readable
+            // Dispatch custom event → editor.tsx useCopilotReadable se aktualizuje
             const allContexts = { ...activeContexts, [type]: contextText };
-            (window as any).__aiRecepceContext = Object.values(allContexts).filter(Boolean).join('\n\n');
-
-            // Předvyplnit chatbot
-            const chatInput = document.querySelector('input[placeholder*="message"], textarea[placeholder*="message"]') as HTMLInputElement;
-            if (chatInput) {
-              const prompt = type === 'kb'
-                ? 'Na základě vybrané znalostní báze napiš informační příspěvek.'
-                : type === 'products'
-                ? 'Na základě vybraných produktů napiš propagační příspěvek.'
-                : type === 'reservations'
-                ? 'Na základě volných termínů napiš příspěvek o dostupnosti.'
-                : 'Na základě CRM dat napiš příspěvek o úspěších firmy.';
-
-              const fullPrompt = `Kontext: ${contextText.substring(0, 500)}. ${prompt}`;
-              const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
-              setter?.call(chatInput, fullPrompt);
-              chatInput.dispatchEvent(new Event('input', { bubbles: true }));
-              chatInput.focus();
-
-              // Automaticky odeslat zprávu po 500ms
-              setTimeout(() => {
-                // Najít submit button v CopilotKit
-                const submitBtn = chatInput.closest('form')?.querySelector('button[type="submit"]')
-                  || chatInput.parentElement?.querySelector('button')
-                  || document.querySelector('[class*="copilot"] button[type="submit"]');
-                if (submitBtn) {
-                  (submitBtn as HTMLButtonElement).click();
-                } else {
-                  // Fallback: dispatch Enter
-                  chatInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
-                }
-              }, 500);
-            }
+            const fullContext = Object.values(allContexts).filter(Boolean).join('\n\n');
+            window.dispatchEvent(new CustomEvent('airecepce-context', { detail: fullContext }));
           }}
         />
       ),
