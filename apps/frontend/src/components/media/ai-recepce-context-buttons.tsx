@@ -231,11 +231,91 @@ const ProductsModal: FC<{ onDone: (t: string) => void }> = ({ onDone }) => {
 };
 
 // ============================================================
+// Web Scrape Modal
+// ============================================================
+const WebScrapeModal: FC<{ onDone: (t: string) => void }> = ({ onDone }) => {
+  const [url, setUrl] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState('');
+  const modal = useModals();
+
+  const scrape = async () => {
+    if (!url) return;
+    setLoading(true); setError(''); setData(null);
+    try {
+      const authToken = document.cookie.match(/auth=([^;]+)/)?.[1] || '';
+      const resp = await fetch(`${AI_RECEPCE_URL}/api/social-media/context/scrape?${getAuthParam()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const d = await resp.json();
+      if (d.error) { setError(d.error); return; }
+      setData(d);
+    } catch (e: any) { setError(e.message || 'Chyba'); }
+    finally { setLoading(false); }
+  };
+
+  const confirm = () => {
+    if (!data) return;
+    const imgList = (data.images || []).slice(0, 10).map((img: any) => img.src).join('\n');
+    const text = `Webová stránka "${data.title}" (${data.url}):\n${data.description}\n\nObsah:\n${data.text?.substring(0, 1500) || ''}\n\nObrázky:\n${imgList}`;
+    onDone(text);
+    modal.closeCurrent();
+  };
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        <input type="url" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://example.com"
+          className="flex-1 bg-newBgLineColor text-textColor border border-newBorder rounded-lg px-3 py-2 text-sm"
+          onKeyDown={e => e.key === 'Enter' && scrape()} />
+        <button onClick={scrape} disabled={loading || !url}
+          className="bg-btnPrimary text-white px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-90 disabled:opacity-50 shrink-0">
+          {loading ? 'Scrapuji...' : 'Scrapovat'}
+        </button>
+      </div>
+      {error && <div className="text-red-500 text-sm">{error}</div>}
+      {data && (
+        <div className="flex flex-col gap-3">
+          <div className="bg-newBgLineColor rounded-lg p-3">
+            <div className="text-sm font-semibold">{data.title}</div>
+            <div className="text-xs text-textItemBlur mt-1">{data.description}</div>
+            <div className="text-xs text-textItemBlur mt-1">{data.url}</div>
+          </div>
+          {data.text && (
+            <div className="max-h-[150px] overflow-y-auto text-xs text-textItemBlur bg-newBgLineColor rounded-lg p-3">
+              {data.text.substring(0, 500)}...
+            </div>
+          )}
+          {data.images?.length > 0 && (
+            <div>
+              <div className="text-xs font-semibold text-textItemBlur mb-1">Obrázky ({data.imageCount})</div>
+              <div className="flex gap-2 flex-wrap max-h-[120px] overflow-y-auto">
+                {data.images.slice(0, 20).map((img: any, i: number) => (
+                  <img key={i} src={img.src} alt={img.alt} className="w-16 h-16 rounded object-cover border border-newBorder"
+                    onError={e => (e.currentTarget.style.display = 'none')} />
+                ))}
+              </div>
+            </div>
+          )}
+          <button onClick={confirm} className="w-full bg-btnPrimary text-white py-2.5 rounded-lg font-semibold hover:opacity-90">
+            Uložit jako kontext
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ============================================================
 // Icons
 // ============================================================
 const CalIcon: FC = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5.33 1.33V3.33M10.67 1.33V3.33M1.33 6.33H14.67M2.67 2.67H13.33C14.07 2.67 14.67 3.26 14.67 4V13.33C14.67 14.07 14.07 14.67 13.33 14.67H2.67C1.93 14.67 1.33 14.07 1.33 13.33V4C1.33 3.26 1.93 2.67 2.67 2.67Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 const BookIcon: FC = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2.67 12.67V3.33C2.67 2.6 3.26 2 4 2H12C12.74 2 13.33 2.6 13.33 3.33V12.67C13.33 13.4 12.74 14 12 14H4C3.26 14 2.67 13.4 2.67 12.67ZM5.33 5.33H10.67M5.33 8H8.67" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 const ShopIcon: FC = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M1.33 1.33H3.33L5.12 9.59C5.18 9.9 5.35 10.18 5.6 10.37C5.84 10.57 6.15 10.67 6.46 10.67H12.53C12.85 10.67 13.15 10.57 13.4 10.37C13.65 10.18 13.82 9.9 13.88 9.59L14.67 5.33H4M6.67 13.33C6.67 13.7 6.37 14 6 14S5.33 13.7 5.33 13.33 5.63 12.67 6 12.67 6.67 12.96 6.67 13.33ZM13.33 13.33C13.33 13.7 13.04 14 12.67 14S12 13.7 12 13.33 12.3 12.67 12.67 12.67 13.33 12.96 13.33 13.33Z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
+const WebIcon: FC = () => <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 14.67A6.67 6.67 0 108 1.33a6.67 6.67 0 000 13.34zM1.33 8h13.34M8 1.33A10.2 10.2 0 0110.67 8 10.2 10.2 0 018 14.67 10.2 10.2 0 015.33 8 10.2 10.2 0 018 1.33z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>;
 
 // ============================================================
 // Toolbar
@@ -244,6 +324,7 @@ const btns = [
   { key:'reservations', label:'Rezervace', Icon:CalIcon, title:'Vybrat volné termíny' },
   { key:'kb', label:'Znalostní báze', Icon:BookIcon, title:'Vybrat znalostní bázi' },
   { key:'products', label:'Produkty', Icon:ShopIcon, title:'Vybrat produkty' },
+  { key:'scrape', label:'Web stránku', Icon:WebIcon, title:'Scrapovat webovou stránku' },
 ] as const;
 
 export const AiRecepceContextButtons: FC = () => {
@@ -258,7 +339,7 @@ export const AiRecepceContextButtons: FC = () => {
   },[]);
 
   const open = useCallback((type:string, title:string) => {
-    const C = type==='kb'?KBModal:type==='reservations'?ReservationsModal:ProductsModal;
+    const C = type==='kb'?KBModal:type==='reservations'?ReservationsModal:type==='scrape'?WebScrapeModal:ProductsModal;
     modal.openModal({ title, withCloseButton:true, children:<C onDone={t=>handleDone(type,t)}/> });
   },[modal, handleDone]);
 
