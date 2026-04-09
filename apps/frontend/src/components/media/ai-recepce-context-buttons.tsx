@@ -109,17 +109,32 @@ const ContextSelectionModal: FC<{
   const confirm = () => {
     const selectedItems = items.filter(i => selected.has(i.id));
 
-    // Sestavit kontextový text z vybraných položek
-    let contextText = contextData?.textForAI || '';
-    if (type === 'kb' && selectedItems.length < items.length) {
-      contextText = selectedItems.map(i => {
-        if (i.type === 'faq') return `FAQ: ${i.name} → ${i.description}`;
-        if (i.type === 'article') return `Článek: ${i.name}`;
-        return `KB: ${i.name}`;
-      }).join('. ');
-    } else if (type === 'products' && selectedItems.length < items.length) {
-      contextText = 'Vybrané produkty: ' + selectedItems.map(i => `${i.name} (${i.description})`).join(', ');
+    // Sestavit PLNÝ kontextový text — včetně odpovědí a popisů
+    let contextText = '';
+    if (type === 'kb') {
+      // Pro KB: zahrnout plné odpovědi z FAQ + KB body z contextData
+      const faqTexts = (contextData?.faqs || [])
+        .filter((f: any) => selectedItems.some(s => s.id === f.id))
+        .map((f: any) => `Otázka: ${f.question}\nOdpověď: ${f.answer}`)
+        .join('\n\n');
+      const kbTexts = (contextData?.knowledgeBases || [])
+        .filter((kb: any) => selectedItems.some(s => s.id === kb.id))
+        .map((kb: any) => `Znalostní báze "${kb.name}" (${kb.type}): ${kb.body || ''}`)
+        .join('\n\n');
+      const articleTexts = (contextData?.articles || [])
+        .filter((a: any) => selectedItems.some(s => s.id === a.id))
+        .map((a: any) => `Článek "${a.title}": ${a.content || a.excerpt || ''}`)
+        .join('\n\n');
+      contextText = [faqTexts, kbTexts, articleTexts].filter(Boolean).join('\n\n');
+    } else if (type === 'products') {
+      contextText = (contextData?.products || [])
+        .filter((p: any) => selectedItems.some(s => s.id === p.id))
+        .map((p: any) => `Produkt "${p.name}": ${p.description || ''} Cena: ${p.variants?.[0]?.basePrice || '?'} Kč`)
+        .join('\n');
+    } else {
+      contextText = contextData?.textForAI || selectedItems.map(i => `${i.name}: ${i.description || ''}`).join('. ');
     }
+    if (!contextText) contextText = contextData?.textForAI || 'Žádná data';
 
     onSelect(selectedItems, contextText);
     modal.closeCurrent();
@@ -210,12 +225,15 @@ export const AiRecepceContextButtons: FC = () => {
           title={title}
           type={type}
           onSelect={(items, contextText) => {
-            // Aktualizovat active state přes ref (no stale closure)
+            // Aktualizovat active state
             const updated = { ...activeContextsRef.current, [type]: contextText };
             setActiveContexts(updated);
 
-            // Dispatch custom event → editor.tsx useCopilotReadable
+            // Zapsat do window — CopilotPopup instructions ho čte přes polling
             const fullContext = Object.values(updated).filter(Boolean).join('\n\n');
+            (window as any).__aiRecepceCtx = fullContext;
+
+            // Taky dispatch event pro editor readable
             window.dispatchEvent(new CustomEvent('airecepce-context', { detail: fullContext }));
           }}
         />

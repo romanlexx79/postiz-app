@@ -65,12 +65,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
-  // AI Recepce kontext — aktualizuje se přes custom event
+  // AI Recepce kontext — polling z window (context buttons ho tam zapisují)
   const [aiRecepceCtx, setAiRecepceCtx] = useState('');
   useEffect(() => {
-    const handler = (e: CustomEvent) => setAiRecepceCtx(e.detail || '');
-    window.addEventListener('airecepce-context', handler as EventListener);
-    return () => window.removeEventListener('airecepce-context', handler as EventListener);
+    const check = () => {
+      const val = (window as any).__aiRecepceCtx || '';
+      setAiRecepceCtx((prev: string) => prev !== val ? val : prev);
+    };
+    check();
+    const interval = setInterval(check, 500);
+    return () => clearInterval(interval);
   }, []);
 
   const {
