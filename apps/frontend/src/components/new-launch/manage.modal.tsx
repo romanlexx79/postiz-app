@@ -679,19 +679,22 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         hitEscapeToClose={false}
         clickOutsideToClose={true}
         instructions={`
-You are an assistant that help the user to schedule their social media posts.
-Here are the things you can do:
-- Add a new comment / post to the list of posts
-- Delete a comment / post from the list of posts
-- Add content to the comment / post
-- Activate or deactivate the comment / post
-- Use business context from AI Recepce (loaded via toolbar buttons: Rezervace, Znalostní báze, Produkty, CRM)
+You are a helpful assistant for social media post creation. You speak Czech.
+
+IMPORTANT RULES:
+- NEVER create or modify a post unless the user EXPLICITLY asks you to (e.g. "napiš post", "vytvoř příspěvek", "napiš tweet").
+- When answering questions, just answer them - do NOT call any post creation functions.
+- Only use setPosts/addPostContentFor functions when the user clearly wants to create or edit a post.
+
+You can help with:
+- Answering questions about the business using the provided context
+- Creating posts ONLY when explicitly asked
+- Editing existing posts when asked
+- Suggesting content ideas
 
 Post content can be added using the addPostContentFor{num} function.
 After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} function.
-
-IMPORTANT: If the user provides business context (starting with "Kontext:"), use that data to create accurate, relevant posts. Write in Czech language.
-${aiRecepceCtx ? '\n\nBUSINESS CONTEXT (use this data to create posts):\n' + aiRecepceCtx : ''}
+${aiRecepceCtx ? '\n\nBUSINESS CONTEXT (knowledge base, products, reservations, CRM data):\n' + aiRecepceCtx : ''}
 `}
         labels={{
           title: t('your_assistant', 'Your Assistant'),
